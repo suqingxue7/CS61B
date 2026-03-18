@@ -108,22 +108,18 @@ public class Model extends Observable {
      * */
 
     public boolean tilt(Side side) {
-        boolean changed;
-        changed = false;
-
-        // TODO: Modify this.board (and perhaps this.score) to account
-        // for the tilt to the Side SIDE. If the board changed, set the
-        // changed local variable to true.
+        boolean changed = false;
         board.setViewingPerspective(side);
-
         int size = board.size();
+
+        // Step 1: 推紧所有瓦片（向上/向右/向下/向左，由视角决定）
         for (int col = 0; col < size; col++) {
-            for (int row = size - 1; row >= 0; row-- ) {
+            for (int row = size - 1; row >= 0; row--) {
                 Tile t = board.tile(col, row);
                 if (t != null) {
                     int finalrow = row;
                     while (finalrow < size - 1 && board.tile(col, finalrow + 1) == null) {
-                        finalrow ++;
+                        finalrow++;
                     }
                     if (finalrow != row) {
                         board.move(col, finalrow, t);
@@ -133,23 +129,35 @@ public class Model extends Observable {
             }
         }
 
-
+        // Step 2: 合并相邻同值瓦片，标记已合并防止二次合并
+        boolean[] merged = new boolean[size];
         for (int col = 0; col < size; col++) {
+            // 重置合并标记
+            for (int i = 0; i < size; i++) merged[i] = false;
+
             for (int row = size - 2; row >= 0; row--) {
+                Tile t = board.tile(col, row);
+                if (t == null) continue;
+
+                Tile above = board.tile(col, row + 1);
+                if (above != null && t.value() == above.value() && !merged[row + 1]) {
+                    // 合并瓦片：当前瓦片移到上方，数值翻倍
+                    board.move(col, row + 1, t);
+                    score += t.value() * 2;
+                    changed = true;
+                    merged[row + 1] = true; // 标记已合并，禁止二次合并
+                }
+            }
+        }
+
+        // Step 3: 合并后再次推紧，填满新产生的空位
+        for (int col = 0; col < size; col++) {
+            for (int row = size - 1; row >= 0; row--) {
                 Tile t = board.tile(col, row);
                 if (t != null) {
                     int finalrow = row;
-                    boolean check_merge = false;
-
                     while (finalrow < size - 1 && board.tile(col, finalrow + 1) == null) {
-                        finalrow ++;
-                        check_merge = true;
-                    }
-                    Tile tup = board.tile(col, finalrow + 1);
-
-                    while (finalrow < size -1 && board.tile(col, finalrow + 1).value() == t.value() && check_merge == false) {
-                        finalrow ++;
-                        score += 2 * t.value();
+                        finalrow++;
                     }
                     if (finalrow != row) {
                         board.move(col, finalrow, t);
@@ -160,11 +168,8 @@ public class Model extends Observable {
         }
 
         board.setViewingPerspective(Side.NORTH);
-
         checkGameOver();
-        if (changed) {
-            setChanged();
-        }
+        if (changed) setChanged();
         return changed;
     }
 
